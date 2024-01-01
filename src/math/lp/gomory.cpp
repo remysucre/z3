@@ -444,7 +444,7 @@ public:
                 return lia_move::undef;
         }
 
-        if (big_cuts.size()) {
+        if (false && big_cuts.size()) {
             lra.push();        
             for (auto const& cut : big_cuts) 
                 add_cut(cut);
