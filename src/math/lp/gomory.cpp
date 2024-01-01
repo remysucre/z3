@@ -87,6 +87,7 @@ struct create_cut {
         m_t.add_monomial(new_a, j);
         TRACE("gomory_cut_detail", tout << "new_a = " << new_a << ", k = " << m_k << "\n";);
 		if (number_is_too_big(new_a)) m_found_big = true;
+    }
 
     void set_polarity(int p) {
         if (m_polarity == 2) return;
