@@ -246,6 +246,8 @@ public:
 
     lia_move cut() {
         TRACE("gomory_cut", dump(tout););
+        if (m_f.is_zero())
+            return lia_move::undef;
         m_polarity = 0; // 0: means undefined, +-1, the polar case, 2: the mixed case
         // gomory cut will be  m_t >= m_k and the current solution has a property m_t < m_k
         m_k = 1;
@@ -254,8 +256,7 @@ public:
         m_found_big = false;
         TRACE("gomory_cut_detail", tout << "m_f: " << m_f << ", ";
               tout << "1 - m_f: " << 1 - m_f << ", get_value(m_inf_col).x - m_f = " << get_value(m_inf_col).x - m_f << "\n";);
-        lp_assert(m_f.is_pos() && (get_value(m_inf_col).x - m_f).is_int());  
-
+        
         m_abs_max = 0;
         for (const auto & p : m_row) {
             mpq t = abs(ceil(p.coeff()));
@@ -292,6 +293,10 @@ public:
                     else
                         set_polarity(1);
                 }
+            } 
+            else if (!get_value(j).x.is_int()) { // check that the value is not integer
+                SASSERT(is_int(j));
+                m_polarity = 2; // we cannot set a bound on m_inf_col since it is lumped together with other integer vars
             }
 
             if (m_found_big) {
@@ -316,16 +321,29 @@ public:
         return lia_move::cut;
     }
 
+    void init_fractional_parts() {
+        m_f = 0; 
+        for (const auto & p : m_row) {
+            lpvar j = p.var();
+		    if (column_is_fixed(j)) continue;
+            if (lia.at_bound(j)) continue;
+            if (is_int(j) && p.coeff().is_int()) m_f += p.coeff()*get_value(j).x;
+        }
+        m_f = fractional_part(m_f);
+        m_one_minus_f = 1 - m_f;
+    }
+
+
+
     create_cut(lar_term & t, mpq & k, explanation* ex, unsigned basic_inf_int_j, const row_strip<mpq>& row, int_solver& lia) :
         m_t(t),
         m_k(k),
         m_ex(ex),
         m_inf_col(basic_inf_int_j),
         m_row(row),
-        lia(lia),
-        m_f(fractional_part(get_value(basic_inf_int_j).x)),
-        m_one_minus_f(1 - m_f) {}
-    
+        lia(lia){
+            init_fractional_parts();
+        }    
     };
 
     bool gomory::is_gomory_cut_target(lpvar k) {
@@ -333,22 +351,31 @@ public:
         // All non base variables must be at their bounds and assigned to rationals (that is, infinitesimals are not allowed).
         const row_strip<mpq>& row = lra.get_row(lia.row_of_basic_column(k));
         unsigned j;
+        TRACE("gomory_cut_detail", lra.print_column_info(k, tout); 
+            tout << "m_f = " << fractional_part(lia.get_value(k))  << std::endl;);
+            
         for (const auto & p : row) {
             j = p.var();
-            if ( k != j && (!lia.at_bound(j) || lia.get_value(j).y != 0)) {
-                TRACE("gomory_cut", tout << "row is not gomory cut target:\n";
+            if (j == k) continue;
+            const impq & v = lia.get_value(j);
+            if (v.y != 0) return false;
+            if (lia.at_bound(j)) continue;
+            
+            TRACE("gomory_cut_detail", lra.print_column_info(j, tout); 
+            tout << "v = " << v << ", p.coeff() = " << p.coeff() << ", is int = " << lra.column_is_int(j) << std::endl;);
+            
+            if (lra.column_is_int(j) && p.coeff().is_int() ) continue; // it will participate in m_f            
+			TRACE("gomory_cut", tout << "row is not gomory cut target:\n";
                       lia.display_column(tout, j);
-                      tout << "infinitesimal: " << !(lia.get_value(j).y ==0) << "\n";);
-                return false;
-            }
+					  tout << "infinitesimal: " << !(lia.get_value(j).y ==0) << "\n";);
+            return false;
         }
         return true;
     }
 
  // return the minimal distance from the variable value to an integer
     mpq get_gomory_score(const int_solver& lia, lpvar j) {
-        const mpq& val = lia.get_value(j).x;
-        auto l = val - floor(val);
+        mpq l = fractional_part(lia.get_value(j).x);
         if (l <= mpq(1, 2))
             return l;
         return mpq(1) - l;
@@ -483,7 +510,6 @@ public:
         if (has_small_cut || big_cuts.size())
             return lia_move::continue_with_check;
         
-        lra.move_non_basic_columns_to_bounds();
         return lia_move::undef;
     }
     

@@ -195,7 +195,6 @@ namespace lp {
         ++m_number_of_calls;
         if (r == lia_move::undef && m_patcher.should_apply()) r = m_patcher();
         if (r == lia_move::undef && should_find_cube()) r = int_cube(*this)();
-        if (r == lia_move::undef) lra.move_non_basic_columns_to_bounds();
         if (r == lia_move::undef && should_hnf_cut()) r = hnf_cut();
 
         if (r == lia_move::undef && should_gomory_cut()) r = gomory(*this).get_gomory_cuts(2);
