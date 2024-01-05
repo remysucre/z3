@@ -31,6 +31,7 @@ struct create_cut {
     unsigned              m_inf_col; // a basis column which has to be an integer but has a non integral value
     const row_strip<mpq>& m_row;
     int_solver&           lia;
+    mpq                   m_v; //  sum (a[j]*x[j]) where or a[j] is integral and x[j] is not at a bound, this way m_inf_col is included
     mpq                   m_f;
     mpq                   m_one_minus_f;
     mpq                   m_fj;
@@ -278,6 +279,7 @@ public:
             if (is_real(j))
                 real_case_in_gomory_cut(- p.coeff(), j);
             else if (!p.coeff().is_int()) {
+                SASSERT(lia.at_bound(j));
                 m_fj = fractional_part(-p.coeff());
                 m_one_minus_fj = 1 - m_fj;
                 int_case_in_gomory_cut(j);
@@ -294,10 +296,6 @@ public:
                         set_polarity(1);
                 }
             } 
-            else if (!get_value(j).x.is_int()) { // check that the value is not integer
-                SASSERT(is_int(j));
-                m_polarity = 2; // we cannot set a bound on m_inf_col since it is lumped together with other integer vars
-            }
 
             if (m_found_big) {
                 return lia_move::undef;
@@ -322,14 +320,14 @@ public:
     }
 
     void init_fractional_parts() {
-        m_f = 0; 
+        m_v = 0; 
         for (const auto & p : m_row) {
             lpvar j = p.var();
 		    if (column_is_fixed(j)) continue;
             if (lia.at_bound(j)) continue;
-            if (is_int(j) && p.coeff().is_int()) m_f += p.coeff()*get_value(j).x;
+            if (is_int(j) && p.coeff().is_int()) m_v += p.coeff()*get_value(j).x;
         }
-        m_f = fractional_part(m_f);
+        m_f = fractional_part(m_v);
         m_one_minus_f = 1 - m_f;
     }
 
@@ -492,12 +490,39 @@ public:
 
 // this way we create bounds for the variables in polar cases even where the terms have big numbers
         for (auto const& p : polar_vars) {
+            lar_term t;
+            const row_strip<mpq>& row = lra.get_row(lia.row_of_basic_column(p.j));
+            for (const auto& m : row) {
+                if (!lia.at_bound(m.var())) {
+                    SASSERT(m.coeff().is_int() && lra.column_is_int(m.var()));
+                    t.add_monomial(m.coeff(), m.var());
+                }
+            }
+            lp::lpvar term_index;
+            if (t.size() > 1) {
+                term_index = lra.add_term(t.coeffs_as_vector(), UINT_MAX);
+                term_index = lra.map_term_index_to_column_index(term_index);
+            }
+            
             if (p.polarity == 1) {
-                lra.update_column_type_and_bound(p.j, lp::lconstraint_kind::LE, floor(lra.get_column_value(p.j).x), p.dep);
+                if (t.size()==1) 
+                    lra.update_column_type_and_bound(p.j, lp::lconstraint_kind::LE, floor(lra.get_column_value(p.j).x), p.dep);
+                else {
+                    lra.update_column_type_and_bound(term_index,
+                                                     lp::lconstraint_kind::LE,
+                                                     floor(lra.get_column_value(p.j).x), p.dep); 
+                }
             }
             else {
                 SASSERT(p.polarity == -1);
-                lra.update_column_type_and_bound(p.j, lp::lconstraint_kind::GE, ceil(lra.get_column_value(p.j).x), p.dep);
+                if (t.size() == 1)
+                    lra.update_column_type_and_bound(p.j, lp::lconstraint_kind::GE, ceil(lra.get_column_value(p.j).x), p.dep);
+                else {
+                    lra.update_column_type_and_bound(term_index,
+                                                     lp::lconstraint_kind::GE,
+                                                     ceil(lra.get_column_value(p.j).x), p.dep); 
+                }
+
             }
         }
         
