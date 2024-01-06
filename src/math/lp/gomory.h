@@ -34,6 +34,7 @@ namespace lp {
         void add_big_cuts(const vector<cut_result>&);
         void add_cut(const cut_result&);
         bool check_feasible();
+        mpq get_gomory_score(lpvar) const;
     public:
         lia_move get_gomory_cuts(unsigned num_cuts);
         gomory(int_solver& lia);

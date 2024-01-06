@@ -395,8 +395,16 @@ public:
     }
 
  // return the minimal distance from the variable value to an integer
-    mpq get_gomory_score(const int_solver& lia, lpvar j) {
-        mpq l = fractional_part(lia.get_value(j).x);
+     mpq gomory::get_gomory_score(lpvar j) const {
+        const row_strip<mpq>& row = lra.get_row(lia.row_of_basic_column(j));
+        mpq v(0);
+      
+        for (const auto & p : row) {
+            if (lia.at_bound(p.var())) continue;
+            if (p.coeff().is_int() && lia.column_is_int(p.var()))
+                v += p.coeff()*lia.get_value(p.var()).x;
+        }
+        mpq l = fractional_part(v);
         if (l <= mpq(1, 2))
             return l;
         return mpq(1) - l;
@@ -410,7 +418,7 @@ public:
                 continue;
             SASSERT(!lia.is_fixed(j));            
             sorted_vars.push_back(j);
-            score[j] = get_gomory_score(lia, j);
+            score[j] = get_gomory_score(j);
         }
         // prefer the variables with the values close to integers
         sorted_vars.sort([&](lpvar j, lpvar k) {
