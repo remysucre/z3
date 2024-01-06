@@ -344,6 +344,28 @@ public:
         }    
     };
 
+    bool gomory::row_invariant(const row_strip<mpq>& row) const {
+        for (const auto & p : row) {
+            lpvar j = p.var();
+            const impq & v = lia.get_value(j);
+            if (v.y != 0) {
+                TRACE("gomory_cut_detail", lra.print_column_info(j, tout); 
+                    tout << "is_int = " << lra.column_is_int(j) << ", p.coeff().is_int() = " << p.coeff().is_int()  << 
+                    ", v = " 
+                    << v << std::endl);       
+                return false;
+            }
+            if (lia.at_bound(j)) continue;            
+            if (lra.column_is_int(j) && p.coeff().is_int() ) continue; // it will participate in m_f     
+            TRACE("gomory_cut_detail", lra.print_column_info(j, tout); 
+                    tout << "is_int = " << lra.column_is_int(j) << ", p.coeff().is_int() = " << p.coeff().is_int()  << 
+                    ", v = " 
+                    << v << std::endl);       
+            return false;
+        }
+        return true;
+    }
+
     bool gomory::is_gomory_cut_target(lpvar k) {
         SASSERT(lia.is_base(k));
         // All non base variables must be at their bounds and assigned to rationals (that is, infinitesimals are not allowed).
@@ -368,6 +390,7 @@ public:
 					  tout << "infinitesimal: " << !(lia.get_value(j).y ==0) << "\n";);
             return false;
         }
+        SASSERT(row_invariant(row));
         return true;
     }
 
@@ -418,10 +441,40 @@ public:
         }
         return ret;
     }
-    
+
+    struct cut_result {u_dependency *dep; lar_term t; mpq k; int polarity; lpvar j;};
+
+    void gomory::add_big_cuts(const vector<cut_result>& big_cuts)  {
+        if (big_cuts.size() == 0) return;
+        lra.push();        
+        for (auto const& cut : big_cuts) 
+            add_cut(cut);
+        bool feas = check_feasible();
+        lra.pop(1);
+        
+        if (!feas)       
+            for (auto const& cut : big_cuts) 
+                add_cut(cut);
+    }
+    void gomory::add_cut(const cut_result& cr) {
+        u_dependency* dep = cr.dep;
+        lp::lpvar term_index = lra.add_term(cr.t.coeffs_as_vector(), UINT_MAX);
+        term_index = lra.map_term_index_to_column_index(term_index);
+        lra.update_column_type_and_bound(term_index,
+                                         lp::lconstraint_kind::GE,
+                                         lia.m_k, dep);            
+    }
+
+    bool gomory::check_feasible() {
+        lra.find_feasible_solution();
+        if (!lra.is_feasible() && !lia.settings().get_cancel_flag()) {
+            lra.get_infeasibility_explanation(*lia.m_ex);
+            return false;
+        }
+        return true;
+    }
 
     lia_move gomory::get_gomory_cuts(unsigned num_cuts) {
-        struct cut_result {u_dependency *dep; lar_term t; mpq k; int polarity; lpvar j;};
         vector<cut_result> big_cuts;
         struct polar_info {lpvar j; int polarity;  u_dependency *dep;};
         vector<polar_info> polar_vars;
@@ -431,22 +484,6 @@ public:
         // define inline helper functions
         auto is_small_cut = [&](lar_term const& t) {
             return all_of(t, [&](auto ci) { return ci.coeff().is_small(); });
-        };
-        auto add_cut = [&](cut_result const& cr) {
-            u_dependency* dep = cr.dep;
-            lp::lpvar term_index = lra.add_term(cr.t.coeffs_as_vector(), UINT_MAX);
-            term_index = lra.map_term_index_to_column_index(term_index);
-            lra.update_column_type_and_bound(term_index,
-                                             lp::lconstraint_kind::GE,
-                                             lia.m_k, dep);            
-        };
-        auto _check_feasible = [&](void) {
-            lra.find_feasible_solution();
-            if (!lra.is_feasible() && !lia.settings().get_cancel_flag()) {
-                lra.get_infeasibility_explanation(*lia.m_ex);
-                return false;
-            }
-            return true;
         };
 
 // start creating cuts        
@@ -475,23 +512,12 @@ public:
                 return lia_move::undef;
         }
 
-        if (big_cuts.size()) {
-            lra.push();        
-            for (auto const& cut : big_cuts) 
-                add_cut(cut);
-            bool feas = _check_feasible();
-            lra.pop(1);
-
-            if (!feas)       
-                for (auto const& cut : big_cuts) 
-                    add_cut(cut);
-            
-        }
-
+        
 // this way we create bounds for the variables in polar cases even where the terms have big numbers
         for (auto const& p : polar_vars) {
             lar_term t;
             const row_strip<mpq>& row = lra.get_row(lia.row_of_basic_column(p.j));
+            SASSERT(row_invariant(row));
             for (const auto& m : row) {
                 if (!lia.at_bound(m.var())) {
                     SASSERT(m.coeff().is_int() && lra.column_is_int(m.var()));
@@ -503,7 +529,6 @@ public:
                 term_index = lra.add_term(t.coeffs_as_vector(), UINT_MAX);
                 term_index = lra.map_term_index_to_column_index(term_index);
             }
-            
             if (p.polarity == 1) {
                 if (t.size()==1) 
                     lra.update_column_type_and_bound(p.j, lp::lconstraint_kind::LE, floor(lra.get_column_value(p.j).x), p.dep);
@@ -522,11 +547,12 @@ public:
                                                      lp::lconstraint_kind::GE,
                                                      ceil(lra.get_column_value(p.j).x), p.dep); 
                 }
-
             }
         }
+
+        add_big_cuts(big_cuts);
         
-        if (!_check_feasible())
+        if (!check_feasible())
             return lia_move::conflict;
         
         if (!lia.has_inf_int())
