@@ -33,7 +33,6 @@ class lar_solver;
 class lar_core_solver;
 
 class int_solver {
-    friend class gomory;
     friend struct create_cut;
     friend class gomory;
     friend class int_cube;

@@ -541,9 +541,9 @@ public:
                 if (t.size()==1) 
                     lra.update_column_type_and_bound(p.j, lp::lconstraint_kind::LE, floor(lra.get_column_value(p.j).x), p.dep);
                 else {
-                    lra.update_column_type_and_bound(term_index,
-                                                     lp::lconstraint_kind::LE,
-                                                     floor(lra.get_column_value(p.j).x), p.dep); 
+                    // lra.update_column_type_and_bound(term_index,
+                    //                                  lp::lconstraint_kind::LE,
+                    //                                  floor(lra.get_column_value(p.j).x), p.dep); 
                 }
             }
             else {
@@ -569,6 +569,7 @@ public:
         if (has_small_cut || big_cuts.size())
             return lia_move::continue_with_check;
         
+        lra.move_non_basic_columns_for_gomory_cut();
         return lia_move::undef;
     }
     

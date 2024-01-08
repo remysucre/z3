@@ -659,8 +659,11 @@ public:
         return *m_terms[t.id()];
     }
     lp_status find_feasible_solution();
-    void move_non_basic_columns_to_bounds();
+    void move_non_basic_columns_to_bounds();    
+    void move_non_basic_columns_for_gomory_cut();
     bool move_non_basic_column_to_bounds(unsigned j);
+    bool move_non_basic_column_to_bounds_for_gomory_cut(unsigned j);
+    
     inline bool r_basis_has_inf_int() const {
         for (unsigned j : r_basis()) {
             if (column_is_int(j) && !column_value_is_int(j))

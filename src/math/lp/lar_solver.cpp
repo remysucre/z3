@@ -460,6 +460,38 @@ namespace lp {
         find_feasible_solution();
     }
 
+    void lar_solver::move_non_basic_columns_for_gomory_cut() {
+        auto& lcs = m_mpq_lar_core_solver;
+        bool change = false;
+        for (unsigned j : lcs.m_r_nbasis) {
+            if (move_non_basic_column_to_bounds_for_gomory_cut(j))
+                change = true;
+        }
+        if (!change)
+            return;
+        if (settings().simplex_strategy() == simplex_strategy_enum::tableau_costs)
+            update_x_and_inf_costs_for_columns_with_changed_bounds_tableau();
+
+        find_feasible_solution();
+    }
+
+    bool lar_solver::move_non_basic_column_to_bounds_for_gomory_cut(unsigned j) {
+        bool skip = column_is_int(j);
+        if (skip) {
+            for (const auto& c : A_r().m_columns[j]) {
+                if (!A_r().get_val(c).is_int()) {
+                    skip = false;
+                    break;
+                }               
+            }
+        }
+        if (skip) {
+            return false;
+        } 
+        return move_non_basic_column_to_bounds(j);
+    }
+
+
     bool lar_solver::move_non_basic_column_to_bounds(unsigned j) {
         auto& lcs = m_mpq_lar_core_solver;
         auto& val = lcs.m_r_x[j];
