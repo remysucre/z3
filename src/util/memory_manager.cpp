@@ -13,7 +13,7 @@ Copyright (c) 2015 Microsoft Corporation
 #include "util/error_codes.h"
 #include "util/debug.h"
 #include "util/scoped_timer.h"
-#ifndef USE_MALLOC_USABLE_SIZE
+#ifdef AVOID_MALLOC_USABLE_SIZE
 // drop calls to malloc_usable_size
 #elif defined(__GLIBC__)
 # include <malloc.h>

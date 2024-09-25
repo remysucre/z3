@@ -210,12 +210,12 @@ list(APPEND Z3_COMPONENT_EXTRA_INCLUDE_DIRS
 ################################################################################
 # malloc_usable_size()
 ################################################################################
-option(Z3_USE_MALLOC_USABLE_SIZE "Use malloc_usable_size (or equivalents like malloc_size or _msize)" ON)
-if (Z3_USE_MALLOC_USABLE_SIZE)
-  message(STATUS "Using malloc_usable_size")
-  list(APPEND Z3_COMPONENT_CXX_DEFINES "-DUSE_MALLOC_USABLE_SIZE")
+option(Z3_AVOID_MALLOC_USABLE_SIZE "Remove calls to malloc_usable_size (or equivalents like malloc_size or _msize) which is a non-standard API and can cause segfaults." OFF)
+if (Z3_AVOID_MALLOC_USABLE_SIZE)
+  message(STATUS "Dropping calls to malloc_usable_size")
+  list(APPEND Z3_COMPONENT_CXX_DEFINES "-DAVOID_MALLOC_USABLE_SIZE")
 else()
-  message(STATUS "Not using malloc_usable_size")
+  message(STATUS "Using malloc_usable_size")
 endif()
 
 ################################################################################
