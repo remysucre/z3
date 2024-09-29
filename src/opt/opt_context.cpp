@@ -53,6 +53,7 @@ namespace opt {
     void context::scoped_state::push() {
         m_asms_lim.push_back(m_asms.size());
         m_hard_lim.push_back(m_hard.size());
+        m_values_lim.push_back(m_values.size());
         m_objectives_lim.push_back(m_objectives.size());        
         m_objectives_term_trail_lim.push_back(m_objectives_term_trail.size());
     }
@@ -310,9 +311,10 @@ namespace opt {
         }
         solver& s = get_solver();
         s.assert_expr(m_hard_constraints);
-        for (auto const& [var, value] : m_scoped_state.m_values) {
+        if (m_model_converter)
+            m_model_converter->convert_initialize_value(m_scoped_state.m_values);
+        for (auto & [var, value] : m_scoped_state.m_values) 
             s.user_propagate_initialize_value(var, value);
-        }
         
         opt_params optp(m_params);
         symbol pri = optp.priority();

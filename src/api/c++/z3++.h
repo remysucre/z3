@@ -1603,10 +1603,10 @@ namespace z3 {
             unsigned i;
         public:
             iterator(expr& e, unsigned i): e(e), i(i) {}
-            bool operator==(iterator const& other) noexcept {
+            bool operator==(iterator const& other) const noexcept {
                 return i == other.i;
             }
-            bool operator!=(iterator const& other) noexcept {
+            bool operator!=(iterator const& other) const noexcept {
                 return i != other.i;
             }
             expr operator*() const { return e.arg(i); }
@@ -2957,10 +2957,10 @@ namespace z3 {
             expr_vector const * operator->() const { return &(operator*()); }
             expr_vector const& operator*() const noexcept { return m_cube; }
 
-            bool operator==(cube_iterator const& other) noexcept {
+            bool operator==(cube_iterator const& other) const noexcept {
                 return other.m_end == m_end;
             };
-            bool operator!=(cube_iterator const& other) noexcept {
+            bool operator!=(cube_iterator const& other) const noexcept {
                 return other.m_end != m_end;
             };
 
