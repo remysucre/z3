@@ -13,9 +13,8 @@ Copyright (c) 2015 Microsoft Corporation
 #include "util/error_codes.h"
 #include "util/debug.h"
 #include "util/scoped_timer.h"
-#ifdef AVOID_MALLOC_USABLE_SIZE
-// drop calls to malloc_usable_size
-#elif defined(__GLIBC__)
+#ifndef AVOID_MALLOC_USABLE_SIZE
+#ifdef __GLIBC__
 # include <malloc.h>
 # define HAS_MALLOC_USABLE_SIZE
 #elif defined(__APPLE__)
@@ -29,6 +28,7 @@ Copyright (c) 2015 Microsoft Corporation
 # include <malloc.h>
 # define HAS_MALLOC_USABLE_SIZE
 # define malloc_usable_size _msize
+#endif
 #endif
 
 #define SIZE_T_ALIGN 2
